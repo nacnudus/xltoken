@@ -1,0 +1,16 @@
+Package: xltoken
+Title: Tokenize Excel Formulas
+Version: 0.0.0.9000
+Authors@R: person("Duncan", "Garmonsway", email = "duncan.garmonsway@gmail.com", role = c("aut", "cre"))
+Description: Tokenize formulas from Microsoft Excel spreadsheets.  Based on
+    XLParser <https://github.com/spreadsheetlab/XLParser>, ported to C++ using
+    the PEGTL parser generator (embedded) <https://github.com/taocpp/PEGTL> with
+    a thin R wrapper.
+Depends: R (>= 3.3.2)
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+LinkingTo: Rcpp
+Imports: Rcpp
+RoxygenNote: 6.0.1.9000
+Suggests: testthat
