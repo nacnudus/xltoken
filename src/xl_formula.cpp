@@ -26,7 +26,7 @@ Rcpp::CharacterVector xl_formula_(Rcpp::CharacterVector x)
     in_string = Rcpp::as< std::string >(*in_it);
     out_string = ""; // The parse step doesn't return an empty string on failure
 
-    Rcpp::Rcout << in_string + "\n";
+    /* Rcpp::Rcout << in_string + "\n"; */
 
     memory_input<> in_mem( in_string, "original-formula" );
     /* parse< xltoken::root, xltoken::tokenize, tracer >( in_mem, out_string); */
