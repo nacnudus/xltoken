@@ -726,14 +726,6 @@ namespace xltoken
 
   struct FunctionName : ExcelFunction {};
 
-  // To match an arbitrary-length list of arguments, I'm using the form
-  // seq< opt< R >, star< if_must< S, R > > >
-  // which is a modification of
-  // seq< R, star< if_must< S, R > > >
-  // (which is also known as list_must< R, S >) to allow zero arguments
-  /* struct Arguments : list_tail< Argument, comma > {}; */
-  // To allow commas between argument sto be followed by spaces (these appear in
-  // the XLParser tests), there is an opt< space >.
   struct Arguments : if_then_else< not_at< CloseParen >,
                                    list_must< Argument, seq< comma, spaces > >,
                                    success > {};
@@ -764,8 +756,10 @@ namespace xltoken
   {};
 
   struct PostfixOp : percentop {};
-  //
-  // Perhaps should be list_must, but fails with "-E144  New IP deals might require some modifications" because of the double space
+
+  // Perhaps should be list_must, but would fail with:
+  // "-E144  New IP deals might require some modifications"
+  // because of the double space.
   struct References
     : list< Reference,
             sor< colon,
