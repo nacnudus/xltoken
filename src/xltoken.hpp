@@ -522,7 +522,7 @@ namespace xltoken
   // BoolToken boolean literal "TRUE|FALSE"
 
   struct BoolToken
-    : seq< sor< string< 'T', 'R', 'U', 'E' >, 
+    : seq< sor< string< 'T', 'R', 'U', 'E' >,
                 string< 'F', 'A', 'L', 'S', 'E' > >,
            not_at< NameValidCharacter > >
   {};
