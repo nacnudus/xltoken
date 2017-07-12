@@ -1,36 +1,7 @@
-// Tokens must be matched in descending priority order
-// The XLParser priorities are:
-
-/* SheetQuotedToken                       =  1200; */
-/* SheetToken                             =  1200; */
-/* FileToken                              =  1200; */
-/* ExcelRefFunctionToken                  =  1200; */
-/* ExcelFunction                          =  1200; */
-/* UDFToken                               =  1150; */
-/* NamedRangeCombinationToken             =  1100; */ // unnecessary?
-/* CellToken                              =  1000; */
-/* MultipleSheetsToken                    =   100; */
-/* Bool                                   =     0; */
-// I think 0 is the default priority in Irony, so others that should be here
-// are:
-// * NumberToken
-// * TextToken
-// * ErrorToken
-// * RefErrorToken
-// * VRangeToken
-// * HRangeToken
-// * FilePathWindowsToken // This shouldn't be necessary, because all filenames are stored as indices e.g. [9]
-/* SingleQuotedString                     =  -100; */
-/* FileName                               =  -500; */  // unnecessary -- no filenames stored
-/* ReservedNameToken                      =  -700; */
-/* NameToken                              =  -800; */
-/* SRColumnToken                          =  -900; */
-
 #include "tao/pegtl.hpp"
 #include <string>
 #include <Rcpp.h>
 
-/* namespace pegtl = tao::pegtl; */
 using namespace tao::pegtl;
 
 namespace xltoken
