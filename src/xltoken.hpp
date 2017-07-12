@@ -694,6 +694,7 @@ namespace xltoken
               FormulaWithBits,
               spaces,
               CloseParen,
+              opt< PostfixOp >,
               opt< InfixOp, FormulaWithBits > >,
          seq< PrefixOp, FormulaWithBits >,
          seq< Formula,
@@ -702,11 +703,11 @@ namespace xltoken
                         star< InfixOp, FormulaWithBits > > > > >
   {};
 
-  struct Formula : sor< ConstantArray,
-                        Constant,
-                        ReservedName,
+  struct Formula : sor< ReservedName,
                         FunctionCall,
-                        References >
+                        References,
+                        ConstantArray,
+                        Constant >
   {};
 
   struct ReservedName : ReservedNameToken {};
@@ -790,7 +791,7 @@ namespace xltoken
 
   // A modification of list_must
   struct Union : seq< Reference, comma, Reference,
-                      star_must< comma, Reference > >
+                      star< comma, Reference > >
   {};
 
   struct ReferenceItem
@@ -828,9 +829,16 @@ namespace xltoken
            SheetsToken >
   {};
 
+  struct EnclosedInBracketsToken
+    : plus< not_one< '[', ']' > >
+  {};
+
   struct StructuredReferenceElement
-    : seq< OpenSquareParen, sor< seq< SRColumnToken, CloseSquareParen >,
-                                 seq< NameToken, CloseSquareParen > > >
+    : seq< OpenSquareParen,
+           sor< SRColumnToken,
+                NameToken,
+                EnclosedInBracketsToken >,
+           CloseSquareParen >
   {};
 
   struct StructuredReferenceTable : NameToken {};
