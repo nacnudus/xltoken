@@ -2,10 +2,18 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 xl_check_grammar_ <- function() {
-    invisible(.Call('xltoken_xl_check_grammar_', PACKAGE = 'xltoken'))
+    invisible(.Call('_xltoken_xl_check_grammar_', PACKAGE = 'xltoken'))
 }
 
 xl_formula_ <- function(x) {
-    .Call('xltoken_xl_formula_', PACKAGE = 'xltoken', x)
+    .Call('_xltoken_xl_formula_', PACKAGE = 'xltoken', x)
+}
+
+xl_check_ref_grammar_ <- function() {
+    invisible(.Call('_xltoken_xl_check_ref_grammar_', PACKAGE = 'xltoken'))
+}
+
+xl_ref_ <- function(x) {
+    .Call('_xltoken_xl_ref_', PACKAGE = 'xltoken', x)
 }
 

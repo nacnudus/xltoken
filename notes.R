@@ -1,6 +1,3 @@
-Rcpp::compileAttributes()
-document()
-
 # TODO: output a sensible data frame of tokens.
 # * Tags aren't mutually exclusive because there is a hierarchy.
 # * The hierarchy can be expressed by levels.
@@ -32,9 +29,70 @@ document()
 # could be checked specifically.  No, because the parser would have to be
 # compiled on the fly.
 
+# TODO: Use the official grammar? via the paper for XLParser
+# [14] Microsoft, “Excel (.xlsx) extensions to the office openxml spreadsheetml fileformat.” [Online]. Available: https://msdn.microsoft.com/en-us/library/dd922181(v=office.12).aspx
+
+# TODO: Look harder at https://github.com/SheetJS -- does it compute anything?
+# What about styles?
+
+# Tokens, minimally adapted from XLParser
+library(tabulizer)
+library(tidyverse)
+x <- extract_areas("../XLParser/doc/tokens.pdf")
+x <- locate_areas("../XLParser/doc/tokens.pdf")
+extract_tables
+get_page_dims("../XLParser/doc/tokens.pdf")
+595.28/2
+
+col1right <- 190
+col2right <- 333
+col3right <- 475
+
+x <- extract_tables("../XLParser/doc/tokens.pdf",
+                    columns = list(c(col1right, col2right, col3right)),
+                    guess = FALSE)[[1]]
+colnames(x) <- x[1, ]
+x <- x[-1, ]
+x <- as_tibble(x)
+print(x, n = Inf)
+# FILENAME (file reference using name) is not needed because it isn't stored that way in the file
+#
+#          `Token Name`                                                              Description                                           Contents Priority
+#                 <chr>                                                                    <chr>                                              <chr>    <chr>
+#                  BOOL                                                          Boolean literal                                         TRUE|FALSE        0
+#                  CELL                                                           Cell reference                                   $?[A-Z]+$?[0-9]+        2
+#               DDECALL                                               Dynamic Data Exchange link                                       '([^ ']|")+'        0
+#                 ERROR                                                            Error literal           #NULL!|#DIV/0!|#VALUE!|#NAME?|#NUM!|#N/A        0
+#             ERROR-REF                                                  Reference error literal                                              #REF!        0
+#        EXCEL-FUNCTION                                                  Excel built-in function              (Any entry from the function list*)\(        5
+#                  FILE                                     External file reference using number                                         \[[0-9]+\]        5
+#              FILEPATH                                                        Windows file path                      (4 is a note) [A-Z]:\\(4+\\)*        0
+#      HORIZONTAL-RANGE                                                            Range of rows                                  $?[0-9]+:$?[0-9]+        0
+#       MULTIPLE-SHEETS                                                Multiple sheet references   (2 and 3 are notes) ((2+:2+)|('(3|")+:(3|")+'))!        1
+#                  NAME                                                        User Defined Name                (1 is a note) [A-Z_\\][A-Z0-9\\_1]*       -2
+#         NAME-PREFIXED User defined name which starts with a string that could be another token (1 is a note) (TRUE|FALSE|[A-Z]+[0-9]+)[A-Z0-9_1]+        3
+#                NUMBER         An integer, floating point or scientific notation number literal                           [0-9]+,?[0-9]*(e[0-9]+)?        0
+#          REF-FUNCTION                                        Excel built-in reference function                         (INDEX|OFFSET|INDIRECT)\\(        5
+#     REF-FUNCTION-COND                            Excel built-in conditional reference function                                      (IF|CHOOSE)\(        5  not necessarly a reference, could be a constant or an error
+#         RESERVED-NAME                                                   An Excel reserved name                                     _xlnm\.[A-Z_]+       -1
+#                 SHEET                                                  The name of a worksheet                                  (2 is a note) 2+!        5
+#          SHEET-QUOTED                                                    Quoted worksheet name                                 (3 is a note) 3+'!        5
+#                STRING                                                           String literal                                       "([^"]|"")*"        0
+#             SR-COLUMN                                              Structured reference column                                   \[[A-Z0-9\\_]+\]       -3
+#                   UDF                                                    User Defined Function       (1 is a note) (_xll\.)?[A-Z_][A-Z0-9_\\1]*\(        4
+#        VERTICAL-RANGE                                                         Range of columns                                  $?[A-Z]+:$?[A-Z]+        0
+#
+#  * A function list is available as part of the reference implementation.
+#
+# Placeholder character                               Placeholder for                                   Specification
+#                     1                           Extended characters       Non-control Unicode characters x80 and up
+#                     2                              Sheet characters Any character except '*[]\:/?();{}#=<>&+-*/^%,␣
+#                     3                     Enclosed sheet characters                   Any character except '*[]\:/?
+#                     4                           Filename characters                Any character except "*[]\:/?<>|
+
 # Priorities
 # Here is the distribution of the first character of a formula
-#  1     A  8620 address/sheet/namedformula/function/UDF. `(` or `!` decides some
+#  1     A  8620 address/sheet/namedformula/function/UDF/BOOL. `(` or `!` decides some
 #  2     (  2345 openparen (subexpr?)
 #  3     +  2205 prefix (infix?)
 #  4     0  1158 number
@@ -48,67 +106,84 @@ document()
 # 12     #    46 #REF! or #N/A
 # 13     *     3 invalid
 
-# 1. "A".  Could be ref/sheet/namedformula/function/UDF.  Parse all alnum until
+# 1. "A".  Could be ref/sheet/namedformula/function/UDF/BOOL.  Parse all alnum until
 # a terminating character, then decide which it is.
 #   * '('? function/UDF, lookup among known Excel functions to decide
 #   * '!'? sheet, next must be address or namedformula
 #   * '$'? address, next must be rest of address
 #   * infix or ',' or eof? address or name, check address rule to decide
 
-clean_dll()
-install(upgrade_dependencies = FALSE)
-xltoken::xl_check_grammar()
-xltoken:::xl_formula("(1.3+3)%")
-xltoken:::xl_formula("A1")
-xltoken:::xl_formula("A1:B2")
-xltoken:::xl_formula("A1 B2")
-xltoken:::xl_formula("nacnudus")
-xltoken:::xl_formula("(A1)*(B2)")
+Rcpp::compileAttributes()
+document()
+
 
 file.remove("src/xltoken.so")
 file.remove("src/xl_formula.o")
+
+file.remove("src/xl_ref.o")
 install(upgrade_dependencies = FALSE)
-xltoken::xl_formula("XNPV(Assumptions!D56,'Consultant and Enron Valuation'!B18:K18,'Consultant and Enron Valuation'!B3:K3)")
 
-xltoken::xl_formula("DAYS360(R15,$E$3,1)")
-xltoken::xl_formula("6:6")
-xltoken::xl_formula("IF(E2=21:21,E$22:E$23,\" \")")
-xltoken:::xl_formula("DeptSales[@Commission Amount]") # TODO: didn't appear in test formulas
-xltoken:::xl_formula("SUM(Table1[col1],Table1[@col2],4)")
-xltoken:::xl_formula("SUM(Table1[col1],Table1[[#Headers],[col2]],4)")
-xltoken:::xl_formula("IF(R13C3>DATE(2002,1,6),0,IF(ISERROR(R41C[2]),0,IF(R13C3>=R[2]C2:R[6]C[3],0, IF(AND(R[23]C11>=55,R[24]C[11]>=20),R53C3,0))))")
+xltoken:::xl_ref("A:A")       # ref
+xltoken:::xl_ref("A1")        # ref
+xltoken:::xl_ref("A1:A2")     # ref
+xltoken:::xl_ref("1:1")       # ref
 
-xltoken:::xl_formula("\"Hello, \"\"World\"\"\"&\"I can see you\"")
-xltoken:::xl_formula("'C:\\users\\My Documents\\[border.xlsx]Sheet1'!$A$1")
-xltoken:::xl_formula("[1]'Sheet1'!$A$1")
-xltoken:::xl_formula("'[1]Sheet1'!$A$1")
+xltoken:::xl_ref("A1:A")      # ref other other
+xltoken:::xl_ref("A:A1")      # other other ref
 
+xltoken:::xl_ref("A12B")      # other
+xltoken:::xl_ref("ABS()")     # other other
+xltoken:::xl_ref("LOG10()")   # other other
+xltoken:::xl_ref("LOG10")     # ref
+xltoken:::xl_ref("10LOG")     # other
+xltoken:::xl_ref("10LOG()")   # other other
+xltoken:::xl_ref("I3:M3")     # ref
+xltoken:::xl_ref("A1:A2:A3")  # TODO: currently ref other ref, but should : be an operator?
+xltoken:::xl_ref("ISLOGICAL(Team America:World Police)")  # valid, and shows that : is weird
 
-xltoken::xl_formula("(((1000+500+500+500)*4.33*15)*CMF)/SM134Units")
-xltoken::xl_formula("SUM(A1:B1:C1)")
-xltoken::xl_formula("DType = \"pre\"")
-xltoken::xl_formula("DType= \"pre\"")
-xltoken::xl_formula("DType =\"pre\"")
-xltoken::xl_formula("DType=\"pre\"")
-xltoken::xl_formula("DATE(YEAR(UnderStart), MAX(MONTH(UnderStart), EmbeddedFirstMonth) + (Q8 - 1) * 12 /EmbeddedFrequency, 1)")
-xltoken::xl_formula("-E144 * E145")
-xltoken::xl_formula("-E144  New IP deals might require some modifications")
-xltoken::xl_formula("1/100*[2]!BLP(J22,REF!B2,,,[1]!'GJTB3MO Index,[PX_LAST]') ")
-xltoken::xl_formula("(YEAR(I14)-YEAR(C4))*12+MONTH(I14)-MONTH(C4)+IF(MONTH(I14)-MONTH(C4)>=0, IF((DAY(I14)-DAY(C4))>25, 1,( IF(DAY(I14)-DAY(C4)<-5, -1,0))), IF((DAY(I14)-DAY(C4))>25, 1, IF((DAY(I14)-DAY(C4))<-25, -1,0)))")
-xltoken::xl_formula("SUM( X67:X68)")
-xltoken::xl_formula("IF(TRUEMODEL=\"TRUE MODEL\",0.5,RAND())")
-xltoken::xl_formula("IF(SUM(L49:L54)=0,0,$N$41-(SUMIF($A$10:$A$40,IF($L$49=\" \",$A$49,\" \"),$N$10:$N$40))-(SUMIF($A$10:$A$40,IF($L$50=\" \",$A$50,\" \"),$N$10:$N$40))-(SUMIF($A$10:$A$40,IF( $L$51=\" \",$A$51,\" \"),$N$10:$N$40))-(SUMIF($A$10:$A$40,IF($L$52=\" \",$A$52,\" \"),$N$10:$N$40))-(SUMIF($A$10:$A$40,IF($L$53=\" \",$A$53,\" \"),$N$10:$N$40))-(SUMIF($A$10:$A$40,IF($L$54=\" \",$A$54,\" \"),$N$10:$N$40)))")
-xltoken::xl_formula("IF( 0,TRUE,FALSE)")
-xltoken::xl_formula("IF(Scope!G24=\"yes\",\"not used\",\"Assumes that gas compression is not required.\")")
+xltoken::xl_check_ref_grammar()
+xltoken:::xl_ref(c("A1", "N()")) # error
+xltoken:::xl_ref(c("N()"))       # other other
+xltoken:::xl_ref(c("\"N()\"+N()"))       # other other
 
-file.remove("src/xltoken.so")
-file.remove("src/xl_formula.o")
-install(upgrade_dependencies = FALSE)
 library(tidyverse)
 library(stringr)
 # sources <- unique(readLines("./tests/testthat/formulas-distinct.txt"))
 # saveRDS(sources, "sources.Rds", compress = FALSE)
 sources <- readRDS("sources.Rds")
+
+formulas <- data_frame(formula = sources,
+                       ref = map(formula, xltoken::xl_ref))
+
+# Do any of the parsed formulas differ from the original?  No, they're all okay.
+formulas %>%
+  # sample_n(100) %>%
+  mutate(ref = map_chr(ref, ~ paste(.x$token, collapse = ""))) %>%
+  filter(ref != formula)
+
+# How do the ref-type tokens look
+formulas %>%
+  sample_n(100) %>%
+  unnest(ref) %>%
+  filter(type == "ref") %>%
+  distinct(token) %>%
+  print(n = Inf)
+
+x <- tidyxl::tidy_xlsx("~/R/tidyxl/tests/testthat/examples.xlsx")$data[[1]]
+
+definitions <-
+  x %>%
+  filter(!is.na(formula_group), !is.na(formula_ref)) %>%
+  select(row, col, content, formula, formula_type, formula_ref, formula_group)
+
+subordinates <-
+  x %>%
+  filter(!is.na(formula_group), is.na(formula_ref)) %>%
+  select(row, col, content, formula, formula_type, formula_ref, formula_group)
+
+  mutate(ref = map_chr
+
+
 parsed <- xltoken::xl_formula(sources)
 checks <- data_frame(sources, parsed) %>% arrange(sources)
 checks %>%

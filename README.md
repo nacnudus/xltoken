@@ -19,3 +19,21 @@ parser generator.
 The end goal is to de-normalise shared formulas in tidyxl, where there is an
 [issue](https://github.com/nacnudus/tidyxl/issues/7) that explains all this much
 better.
+
+The function `xl_formula()` should return the formula you give it.  Behind the
+scenes, it tokenizes it, and then pastes all the tokens back together into one
+string, so if it doesn't return the original, then something has gone wrong.
+The next is to return the parse tree, probably in a data frame, and check that
+it makes sense.
+
+### Simple tokeniser
+
+There's another function, `xl_ref()`, which calls a much simpler parser that
+only attempts to separate cell references from the rest of a formula, and
+returns a data frame of tokens.  In doing so, it creates three types of tokens:
+`ref`, `text` and `other`.  The `text` token is necessary because unless text is
+identified, its contents might be interpreted as a cell reference.
+
+The next steps are to construct a 'ref' object in C++ that can be kept as the
+master copy of a shared formula, and then offset by x rows and y columns to
+reconstruct the denormalised formulas.

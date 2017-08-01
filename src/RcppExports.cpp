@@ -7,7 +7,7 @@ using namespace Rcpp;
 
 // xl_check_grammar_
 void xl_check_grammar_();
-RcppExport SEXP xltoken_xl_check_grammar_() {
+RcppExport SEXP _xltoken_xl_check_grammar_() {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     xl_check_grammar_();
@@ -16,7 +16,7 @@ END_RCPP
 }
 // xl_formula_
 Rcpp::CharacterVector xl_formula_(Rcpp::CharacterVector x);
-RcppExport SEXP xltoken_xl_formula_(SEXP xSEXP) {
+RcppExport SEXP _xltoken_xl_formula_(SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -25,10 +25,32 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// xl_check_ref_grammar_
+void xl_check_ref_grammar_();
+RcppExport SEXP _xltoken_xl_check_ref_grammar_() {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    xl_check_ref_grammar_();
+    return R_NilValue;
+END_RCPP
+}
+// xl_ref_
+Rcpp::List xl_ref_(Rcpp::CharacterVector x);
+RcppExport SEXP _xltoken_xl_ref_(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::CharacterVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(xl_ref_(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
-    {"xltoken_xl_check_grammar_", (DL_FUNC) &xltoken_xl_check_grammar_, 0},
-    {"xltoken_xl_formula_", (DL_FUNC) &xltoken_xl_formula_, 1},
+    {"_xltoken_xl_check_grammar_", (DL_FUNC) &_xltoken_xl_check_grammar_, 0},
+    {"_xltoken_xl_formula_", (DL_FUNC) &_xltoken_xl_formula_, 1},
+    {"_xltoken_xl_check_ref_grammar_", (DL_FUNC) &_xltoken_xl_check_ref_grammar_, 0},
+    {"_xltoken_xl_ref_", (DL_FUNC) &_xltoken_xl_ref_, 1},
     {NULL, NULL, 0}
 };
 
