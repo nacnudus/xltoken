@@ -11,6 +11,9 @@ namespace xltoken
 
   struct space : one< ' ' > {};
   struct spaces : star< space > {};
+  struct underscore : one< '_' > {};
+  struct backslash : one< '\\' > {};
+  struct dot : one< '.' > {};
   struct attoken : one< '@' > {}; // don't clash with tao::pegtl::at<
   struct comma : one< ',' > {};
   struct colon : one< ':' > {};
@@ -22,7 +25,8 @@ namespace xltoken
   struct CloseSquareParen : one< ']' > {};
   struct OpenCurlyParen : one< '{' > {};
   struct CloseCurlyParen : one< '}' > {};
-  struct exclamationMark : one< '!' > {};
+  struct exclamation : one< '!' > {};
+  struct question : one< '?' > {};
   struct QuoteS : one< '\'' > {};
   struct NotQuoteS : not_one< '\'' > {};
   struct QuoteD : one< '"' > {};
@@ -31,7 +35,7 @@ namespace xltoken
   struct mulop : one< '*' > {};
   struct plusop : one< '+' > {};
   struct divop : one< '/' > {};
-  struct minop : one< '-' > {};
+  struct minusop : one< '-' > {};
   struct concatop : one< '&' > {};
   struct expop : one< '^' > {};
 
@@ -52,7 +56,7 @@ namespace xltoken
   // ReservedNameToken this doesn't seem to be documented by Microsoft
   // Regex: _xlnm\.[a-zA-Z_]+
   struct ReservedNameToken
-    : seq< string< '_', 'x', 'l', 'n', 'm', '.' >, plus< sor< alpha, one< '_' > > > >
+    : seq< string< '_', 'x', 'l', 'n', 'm', '.' >, plus< sor< alpha, underscore > > >
   {};
 
   // VRangeToken and HRangeToken, referring to whole rows or whole columns
@@ -115,17 +119,26 @@ namespace xltoken
   // * A1B1
   // * A11B
 
+  // Priority:
+  // * ReservedName
+  // * FunctionCall
+  // * References
+  //     * ReferenceFunctionCall,
+  //     * DynamicDataExchange,
+  //     * seq< OpenParen, spaces, Reference, spaces, CloseParen >,
+  //     * seq< Prefix, ReferenceItem >,
+  //     * ReferenceItem >
+  // * ConstantArray
+  // * Constant
+
   // NameToken as in named formula
   // Start with a letter or underscore, continue with word character (letters,
   // numbers and underscore), dot or question mark
   // * first character: [\p{L}\\_]
   // * subsequent characters: [\w\\_\.\?]
-  struct NameStartCharacter : sor< alpha, one< '_' >, one< '\\' > > {};
+  struct NameStartCharacter : sor< alpha, underscore, backslash > {};
   struct NameValidCharacter
-    : sor< NameStartCharacter,
-           digit,
-           one< '.' >,
-           one< '?' > >
+    : sor< NameStartCharacter, digit, dot, question >
   {};
   struct NameToken : seq< NameStartCharacter, star< NameValidCharacter > >
   {};
@@ -146,7 +159,7 @@ namespace xltoken
 
   // UDFToken user-defined function, regex: (_xll\.)?[\w\\.]+\(
   struct UDFToken : seq< opt< string< '_', 'x', 'l', 'l', '.' > >,
-                         plus< sor< alnum, one< '_' >, one< '.' > > >,
+                         plus< sor< alnum, underscore, dot > >,
                          OpenParen >
   {};
 
@@ -529,15 +542,14 @@ namespace xltoken
 
   // FileToken normalised filenames referred to by an index number
   // enclosed in square brackets
-  struct FileToken : seq< one< '[' >, plus< digit >, one< ']' > > {};
+  struct FileToken : seq< OpenSquareParen, plus< digit >, CloseSquareParen > {};
 
   // NumberToken matches a straightforward decimal number, including exponents.
-  struct plusminus : opt< one< '+', '-' > > {};
-  struct dot : one< '.' > {};
+  struct plusminus : opt< sor< plusop, minusop > > {};
   template< typename D >
     struct decimal : if_then_else< dot,
-    plus< D >,
-    seq< plus< D >, opt< dot, star< D > > > > {};
+                                   plus< D >,
+                                   seq< plus< D >, opt< dot, plus< D > > > > {};
   struct e : one< 'e', 'E' > {};
   struct exponent : seq< plusminus, plus< digit > > {};
   struct NumberToken
@@ -580,20 +592,20 @@ namespace xltoken
 
   struct SheetsToken
     : seq< normalSheetName,
-           sor< exclamationMark, // just one sheet
-                seq< one< ':' >, // range of sheets
+           sor< exclamation, // just one sheet
+                seq< colon, // range of sheets
                      normalSheetName,
-                     exclamationMark > > >
+                     exclamation > > >
   {};
 
   struct SheetsQuotedToken
     : seq< quotedSheetName,
-           sor< seq< one< '\'' >, // just one sheet
-                     exclamationMark >,
-                seq< one< ':' >,      // range of sheets
+           sor< seq< QuoteS, // just one sheet
+                     exclamation >,
+                seq< colon,      // range of sheets
                      quotedSheetName,
-                     one< '\'' >,
-                     exclamationMark > > >
+                     QuoteS,
+                     exclamation > > >
   {};
 
   struct normalSheetName
@@ -627,7 +639,7 @@ namespace xltoken
   {};
 
   // SRColumnToken structured reference column, regex: [\w\\.]+
-  struct SRColumnToken : plus< sor< alnum, one< '_' >, one< '.' > > > {};
+  struct SRColumnToken : plus< sor< alnum, underscore, dot > > {};
 
   // Forward declarations
   struct Argument;
@@ -647,10 +659,6 @@ namespace xltoken
   struct FormulaWithinParen;
   struct FormulaWithBits;
   struct FormulaWithEq;
-  struct FormulaWithInOrPostfixOp;
-  struct FormulaWithInfixOp;
-  struct FormulaWithPostfixOp;
-  struct FormulaWithPrefixOp;
   struct FunctionCall;
   struct FunctionName;
   struct HRange;
@@ -679,13 +687,10 @@ namespace xltoken
 
   // Overall parsing rule
 
-  struct root : sor< FormulaWithEq, FormulaWithBits, ArrayFormula, spaces > {};
+  struct root : sor< FormulaWithBits, ArrayFormula, spaces > {};
 
   struct ArrayFormula
     : seq< OpenCurlyParen, eqop, FormulaWithBits, CloseCurlyParen >
-  {};
-
-  struct FormulaWithEq : seq< eqop, FormulaWithBits >
   {};
 
   struct FormulaWithBits :
@@ -736,7 +741,7 @@ namespace xltoken
                     FormulaWithBits > // not empty
   {};
 
-  struct PrefixOp : sor< plusop, minop > {};
+  struct PrefixOp : sor< plusop, minusop > {};
 
   struct InfixOp :
     seq< spaces,
@@ -744,7 +749,7 @@ namespace xltoken
               mulop,
               divop,
               plusop,
-              minop,
+              minusop,
               concatop,
               neqop,
               gteop,
@@ -809,7 +814,7 @@ namespace xltoken
   struct File : FileToken {};
 
   struct DynamicDataExchange
-    : seq< File, exclamationMark, SingleQuotedStringToken >
+    : seq< File, exclamation, SingleQuotedStringToken >
   {};
 
   struct NamedRange : NameToken {};
@@ -818,7 +823,7 @@ namespace xltoken
     : sor< seq< QuoteS,
                 sor< seq< File, SheetsQuotedToken >,
                      SheetsQuotedToken > >,
-           seq< File, sor< exclamationMark,
+           seq< File, sor< exclamation,
                            SheetsToken > >,
            SheetsToken >
   {};
@@ -881,373 +886,346 @@ namespace xltoken
       }
   };
 
-/*   template<> struct tokenize< FormulaWithEq > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "FormulaWithEq: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< FormulaWithEq > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "FormulaWithEq: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< Formula > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Formula: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Formula > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Formula: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ArrayFormula > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ArrayFormula: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ArrayFormula > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ArrayFormula: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< References > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "References: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< References > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "References: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< Reference > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Reference: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Reference > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Reference: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< Number > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Number: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Number > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Number: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< Constant > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Constant: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Constant > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Constant: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< FunctionCall > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "FunctionCall: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< FunctionCall > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "FunctionCall: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ConstantArray > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ConstantArray: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ConstantArray > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ConstantArray: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ReservedName > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ReservedName: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ReservedName > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ReservedName: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ReferenceItem > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ReferenceItem: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ReferenceItem > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ReferenceItem: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ReferenceFunctionCall > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ReferenceFunctionCall: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ReferenceFunctionCall > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ReferenceFunctionCall: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< NamedRange > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "NamedRange: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< NamedRange > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "NamedRange: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< VRange > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "VRange: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< VRange > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "VRange: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< HRange > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "HRange: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< HRange > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "HRange: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< RefError > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "RefError: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< RefError > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "RefError: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< UDFunctionCall > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "UDFunctionCall: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< UDFunctionCall > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "UDFunctionCall: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< StructuredReference > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "StructuredReference: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< StructuredReference > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "StructuredReference: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< NameToken > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "NameToken: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< NameToken > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "NameToken: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< FunctionName > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "FunctionName: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< FunctionName > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "FunctionName: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< Arguments > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Arguments: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Arguments > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Arguments: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< CloseParen > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "CloseParen: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< CloseParen > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "CloseParen: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< SheetsToken > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "SheetsToken: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< SheetsToken > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "SheetsToken: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< Prefix > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Prefix: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Prefix > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Prefix: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< PrefixOp > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "PrefixOp: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< PrefixOp > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "PrefixOp: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< PostfixOp > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "PostfixOp: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< PostfixOp > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "PostfixOp: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< InfixOp > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "InfixOp: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< InfixOp > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "InfixOp: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ExcelFunction > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ExcelFunction: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ExcelFunction > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ExcelFunction: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ExcelFunction1 > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ExcelFunction1: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ExcelFunction1 > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ExcelFunction1: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ExcelFunction2 > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ExcelFunction2: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ExcelFunction2 > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ExcelFunction2: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< ExcelRefFunctionToken > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "ExcelRefFunctionToken: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< ExcelRefFunctionToken > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "ExcelRefFunctionToken: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< Argument > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Argument: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Argument > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Argument: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< comma > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "comma: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< comma > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "comma: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< FormulaWithinParen > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "FormulaWithinParen: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< FormulaWithinParen > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "FormulaWithinParen: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< FormulaWithBits > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "FormulaWithBits: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< FormulaWithBits > */
+  /* { */
+  /*   template< typename Input > */
+  /*     static void apply( const Input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "FormulaWithBits: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< FormulaWithInfixOp > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "FormulaWithInfixOp: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Bool > */
+  /* { */
+  /*   template< typename input > */
+  /*     static void apply( const input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Bool: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< FormulaWithPostfixOp > */
-/*   { */
-/*     template< typename Input > */
-/*       static void apply( const Input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "FormulaWithPostfixOp: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Text > */
+  /* { */
+  /*   template< typename input > */
+  /*     static void apply( const input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Text: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
-/*   template<> struct tokenize< FormulaWithPrefixOp > */
-/*   { */
-/*     template< typename input > */
-/*       static void apply( const input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "FormulaWithPrefixOp: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
-
-/*   template<> struct tokenize< Bool > */
-/*   { */
-/*     template< typename input > */
-/*       static void apply( const input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Bool: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
-
-/*   template<> struct tokenize< Text > */
-/*   { */
-/*     template< typename input > */
-/*       static void apply( const input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Text: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
-
-/*   template<> struct tokenize< Error > */
-/*   { */
-/*     template< typename input > */
-/*       static void apply( const input & in, std::string & token_value ) */
-/*       { */
-/*         Rcpp::Rcout << "Error: " << in.string() << "\n"; */
-/*       } */
-/*   }; */
+  /* template<> struct tokenize< Error > */
+  /* { */
+  /*   template< typename input > */
+  /*     static void apply( const input & in, std::string & token_value ) */
+  /*     { */
+  /*       Rcpp::Rcout << "Error: " << in.string() << "\n"; */
+  /*     } */
+  /* }; */
 
 } // xltoken
