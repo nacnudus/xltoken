@@ -620,7 +620,9 @@ namespace xltoken
   {};
 
   struct quotedSheetName
-    : star< sor< not_one< '[', ']', '\\', '/', '\'', '*', ':', '?' >,
+    : star< sor< not_one< '[', ']',
+                          '\\', '/',
+                          '\'', '*', ':', '?' >,
                  string< '\'', '\'' > > >
   {};
 
