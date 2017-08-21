@@ -726,7 +726,7 @@ namespace xltoken
   struct RefError : RefErrorToken {};
 
   struct FunctionCall
-    : sor< seq< FunctionName, spaces, opt< Arguments >, spaces, CloseParen > >
+    : seq< FunctionName, spaces, opt< Arguments >, spaces, CloseParen >
   {};
 
   struct FunctionName : ExcelFunction {};
