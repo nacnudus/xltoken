@@ -10,7 +10,14 @@
 # that levels are counted from 0 at the deepest, up to whatever the outermost
 # layer is.
 
-# TODO: eliminate backtracking
+# TODO: reduce backtracking
+# TODO: explain the differences between my tokens and those of XLParser
+#       * NAME-PREFIXED isn't necessary, parser will just call them NAME
+#       * RANGE-OP, INTERSECT-OP and UNION-OP are new operators for e.g. cell ranges
+
+# TODO: explain sheets vs sheetsquoted: it's because the quote appears outside
+# the file, e.g.  '[0]quoted sheet name'!A1 so the sheet name as a whole will
+# never have a quote at the beginning, even if it has one at the end.
 
 # TODO: use a whitespace convention, e.g. this from
 # PETGTL/src/example/pegtl/lua53_parse.cpp
@@ -22,18 +29,8 @@
 # // comments). In some places, where it is more efficient,
 # // right padding is used.
 
-# TODO: recognise defined names as case-insensitive.  Standardise on the first
-# one?
-
-# TODO: Are defined names an formulas in the file somewhere?  Because then they
-# could be checked specifically.  No, because the parser would have to be
-# compiled on the fly.
-
 # TODO: Use the official grammar? via the paper for XLParser
 # [14] Microsoft, “Excel (.xlsx) extensions to the office openxml spreadsheetml fileformat.” [Online]. Available: https://msdn.microsoft.com/en-us/library/dd922181(v=office.12).aspx
-
-# TODO: Look harder at https://github.com/SheetJS -- does it compute anything?
-# What about styles?
 
 # Tokens, minimally adapted from XLParser
 library(tabulizer)
@@ -120,7 +117,7 @@ document()
 file.remove("src/xltoken.so")
 file.remove("src/xl_formula.o")
 
-file.remove("src/xl_ref.o")
+file.remove("src/parse_ref.o")
 install(upgrade_dependencies = FALSE)
 
 xltoken:::xl_ref("A:A")       # ref
@@ -151,6 +148,10 @@ library(stringr)
 # sources <- unique(readLines("./tests/testthat/formulas-distinct.txt"))
 # saveRDS(sources, "sources.Rds", compress = FALSE)
 sources <- readRDS("sources.Rds")
+
+longs <-
+  data_frame(sources, length = str_length(sources)) %>%
+  arrange(desc(length))
 
 formulas <- data_frame(formula = sources,
                        ref = map(formula, xltoken::xl_ref))
@@ -184,7 +185,15 @@ subordinates <-
   mutate(ref = map_chr
 
 
+
+library(tidyverse)
+library(stringr)
+# sources <- unique(readLines("./tests/testthat/formulas-distinct.txt"))
+# saveRDS(sources, "sources.Rds", compress = FALSE)
+sources <- readRDS("sources.Rds")
+
 parsed <- xltoken::xl_formula(sources)
+
 checks <- data_frame(sources, parsed) %>% arrange(sources)
 checks %>%
   filter(parsed != sources) %>%
@@ -192,40 +201,63 @@ checks %>%
   cat(file = "temp.txt", sep = "\n") %>%
   cat(sep = "\n")
 
-checks %>%
-  filter(parsed != sources) %>%
-  pull(sources)
+library(tidyverse)
+library(stringr)
+# sources <- unique(readLines("./tests/testthat/formulas-distinct.txt"))
+# saveRDS(sources, "sources.Rds", compress = FALSE)
+sources <- readRDS("sources.Rds")
+longs <-
+  data_frame(sources, length = str_length(sources)) %>%
+  arrange(desc(length))
+longs$sources[1]
+xltoken::xl_formula(longs$sources[1]) %>%
+  print(n = Inf)
+
+# Union
+xltoken:::xl_formula("SMALL((A1:A4,B1:D3))") # Parses A1:A4 twice
+xltoken:::xl_formula("SMALL(A1:A4,B1:D3)")
+xltoken:::xl_formula("A1:A4")
+
+file.remove("src/xltoken.so")
+clean_dll()
+install(upgrade_dependencies = FALSE)
+xltoken:::xl_formula("'sheet 1:sheet 2'!A1")       # ref
+xltoken:::xl_formula("'sheet1:sheet2'!A1")       # ref
+xltoken:::xl_formula("'sheet 1'!A1")       # ref
+xltoken:::xl_formula("sheet1!A1")       # ref
 
 # InfixOp
-xltoken::xl_formula("=(1*2)+3")
-xltoken::xl_formula("=1*(2+3)")
-xltoken::xl_formula("=1*2+3")
-xltoken::xl_formula("=1*2^3")
-xltoken::xl_formula("=1^2")
+xltoken::xl_formula("(1*2)+3")
+xltoken::xl_formula("1*(2+3)")
+xltoken::xl_formula("1*2+3")
+xltoken::xl_formula("1*2^3")
+xltoken::xl_formula("1^2")
 # PostfixOp
 xltoken::xl_formula("1%")
-xltoken::xl_formula("=1%*5")
-xltoken::xl_formula("=(1%)*5")
-xltoken::xl_formula("=(1%*5)")
-xltoken::xl_formula("=1%*(5)")
+xltoken::xl_formula("1%*5")
+xltoken::xl_formula("(1%)*5")
+xltoken::xl_formula("(1%*5)")
+xltoken::xl_formula("1%*(5)")
 # BoolToken
 xltoken::xl_formula("TRUE")
 xltoken::xl_formula("FALSE")
+xltoken::xl_formula("{1,1;2,2}")
+xltoken::xl_formula("\"A\"")
 # SheetToken
 xltoken::xl_formula("Sheet1!$A$1")
 xltoken::xl_formula("'Sheet 1'!$A$1")
 xltoken::xl_formula("'Sheet 1:Sheet 2'!$A$1")
 xltoken::xl_formula("Sheet1:Sheet2!$A$1")
 # UDFToken
-xltoken::xl_formula("=FOO()") # NamedRange: FOO
-xltoken::xl_formula("=_xll.BAR()") # NamedRange
+xltoken::xl_formula("FOO()")
+xltoken::xl_formula("_xll.BAR()")
 # Formula
-xltoken::xl_formula("=ABS()")
-xltoken::xl_formula("=N()")
-xltoken::xl_formula("=N(1)")
-xltoken::xl_formula("=N(1,)")
-xltoken::xl_formula("=N(1,2)")
-xltoken::xl_formula("=AVERAGE()")
+xltoken::xl_formula("ABS()")
+xltoken::xl_formula("N()")
+xltoken::xl_formula("N(1)")
+xltoken::xl_formula("N(1,)")
+xltoken::xl_formula("N(1,2)")
+xltoken::xl_formula("AVERAGE()")
 # Number
 xltoken::xl_formula("1")
 xltoken::xl_formula("-1")
@@ -269,10 +301,18 @@ xltoken::xl_formula("#VALUE!")
 xltoken::xl_formula("#NAME?")
 xltoken::xl_formula("#NUM!")
 xltoken::xl_formula("#N/A")
+# RefErrorToken
+xltoken::xl_formula("#REF!")
 # ExcelRefFunctionToken
-xltoken::xl_formula("=INDEX()")
-xltoken::xl_formula("=OFFSET()")
-xltoken::xl_formula("=INDIRECT()")
+xltoken::xl_formula("INDEX()")
+xltoken::xl_formula("OFFSET()")
+xltoken::xl_formula("INDIRECT()")
+# ExcelConditionalRefFunctionToken
+xltoken::xl_formula("IF()")
+xltoken::xl_formula("CHOOSE()")
+
+xltoken::xl_formula("TRUEISH()")
+xltoken::xl_formula("FALSEISH()")
 
 # ReservedNameToken
 xltoken::xl_formula("_xlnm._a__dd")
@@ -285,8 +325,6 @@ xltoken::xl_formula("_.aA?")
 # xltoken::xl_formula(".aA?") # error
 xltoken::xl_formula("aA?")
 # xltoken::xl_formula("?aA") # error
-# RefErrorToken
-xltoken::xl_formula("#REF!")
 # FileNameNumericToken
 xltoken::xl_formula("[0]")
 # CellToken
@@ -294,4 +332,4 @@ xltoken::xl_formula("A1")
 xltoken::xl_formula("$A1")
 xltoken::xl_formula("A$1")
 xltoken::xl_formula("$A$1")
-xltoken::xl_formula("=$A$1")
+xltoken::xl_formula("$A$1")
